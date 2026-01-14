@@ -22,6 +22,49 @@
             position: relative;
         }
 
+        .night-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #0a0a2e 0%, #16213e 50%, #1a1a3e 100%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 50;
+            transition: opacity 0.8s ease;
+        }
+
+        .night-overlay.active {
+            opacity: 1;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 0 3px white;
+            animation: twinkle 2s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .moon {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: #ffd700;
+            border-radius: 50%;
+            top: 50px;
+            right: 100px;
+            box-shadow: 0 0 30px #ffd700, 0 0 60px #ffd700;
+        }
+
         body::before {
             content: '';
             position: absolute;
@@ -70,16 +113,44 @@
             filter: drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.3));
         }
 
-        .cat.dancing {
+        .kitten {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            transition: all 0.1s ease;
+            z-index: 9;
+        }
+
+        .kitten img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.3)) brightness(1.2) saturate(0.7);
+            opacity: 0.9;
+        }
+
+        .cat.dancing, .kitten.dancing {
             animation: dance 0.3s infinite;
         }
 
-        .cat.eating {
+        .cat.eating, .kitten.eating {
             animation: fastDance 0.15s infinite;
         }
 
-        .cat.spinning {
+        .cat.spinning, .kitten.spinning {
             animation: spinDance 1.5s ease-in-out;
+        }
+
+        .cat.party {
+            animation: duetDanceLeft 0.6s infinite;
+            filter: drop-shadow(0 0 30px #ff00ff) drop-shadow(0 0 40px #ff6b9d);
+            z-index: 100;
+        }
+
+        .kitten.party {
+            animation: duetDanceRight 0.6s infinite;
+            filter: drop-shadow(0 0 30px #00ffff) drop-shadow(0 0 40px #6bb6ff);
+            z-index: 100;
         }
 
         @keyframes dance {
@@ -127,6 +198,42 @@
             }
             100% {
                 transform: rotate(720deg) scale(1);
+            }
+        }
+
+        @keyframes duetDanceLeft {
+            0% {
+                transform: rotate(-15deg) scale(1) translateY(0) translateX(0);
+            }
+            25% {
+                transform: rotate(10deg) scale(1.2) translateY(-30px) translateX(-10px);
+            }
+            50% {
+                transform: rotate(-15deg) scale(1.4) translateY(-50px) translateX(0);
+            }
+            75% {
+                transform: rotate(10deg) scale(1.2) translateY(-30px) translateX(-10px);
+            }
+            100% {
+                transform: rotate(-15deg) scale(1) translateY(0) translateX(0);
+            }
+        }
+
+        @keyframes duetDanceRight {
+            0% {
+                transform: rotate(15deg) scale(1) translateY(0) translateX(0);
+            }
+            25% {
+                transform: rotate(-10deg) scale(1.2) translateY(-30px) translateX(10px);
+            }
+            50% {
+                transform: rotate(15deg) scale(1.4) translateY(-50px) translateX(0);
+            }
+            75% {
+                transform: rotate(-10deg) scale(1.2) translateY(-30px) translateX(10px);
+            }
+            100% {
+                transform: rotate(15deg) scale(1) translateY(0) translateX(0);
             }
         }
 
@@ -229,32 +336,139 @@
                 opacity: 0;
             }
         }
+
+        .spotlight {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+            pointer-events: none;
+            z-index: 99;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .spotlight.active {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
+    <div class="night-overlay" id="nightOverlay">
+        <div class="moon"></div>
+    </div>
+
     <div class="info">
         <div>🐱 클릭해서 고양이 먹이를 주세요! 🐟</div>
         <div class="counter">먹은 먹이: <span id="foodCount">0</span>개</div>
     </div>
 
+    <div class="spotlight" id="spotlight1"></div>
+    <div class="spotlight" id="spotlight2"></div>
+
     <div class="cat" id="cat">
-        <img src="./cat-transparent.png" alt="고양이">
+        <img src="cat-transparent.png" alt="고양이">
+    </div>
+
+    <div class="kitten" id="kitten">
+        <img src="cat-transparent.png" alt="새끼고양이">
     </div>
 
     <script>
+        // Audio Context 초기화
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playEatSound(pitch = 1) {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 600 * pitch;
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        function playHappySound() {
+            const frequencies = [523, 659, 784];
+            frequencies.forEach((freq, i) => {
+                setTimeout(() => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    oscillator.frequency.value = freq;
+                    oscillator.type = 'sine';
+
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.15);
+
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.15);
+                }, i * 100);
+            });
+        }
+
+        function playPartyMusic() {
+            const melody = [523, 659, 784, 1047, 784, 659, 523, 659, 784, 659];
+            melody.forEach((freq, i) => {
+                setTimeout(() => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    oscillator.frequency.value = freq;
+                    oscillator.type = 'square';
+
+                    gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                }, i * 200);
+            });
+        }
+
         const cat = document.getElementById('cat');
+        const kitten = document.getElementById('kitten');
         const foodCountDisplay = document.getElementById('foodCount');
+        const spotlight1 = document.getElementById('spotlight1');
+        const spotlight2 = document.getElementById('spotlight2');
+        const nightOverlay = document.getElementById('nightOverlay');
+
         let catX = window.innerWidth / 2 - 75;
         let catY = window.innerHeight / 2 - 75;
-        let isMoving = false;
-        let isEating = false;
+        let catMoving = false;
+        let catEating = false;
         let foodCount = 0;
         let catSize = 150;
 
+        let kittenX = Math.random() * (window.innerWidth - 70);
+        let kittenY = Math.random() * (window.innerHeight - 70);
+        let kittenMoving = false;
+        let kittenEating = false;
+        let kittenSize = 70;
+
+        let isPartyMode = false;
+
+        const foodItems = [];
+        const foodEmojis = ['🐟', '🍖', '🥩', '🍗', '🦴', '🥫'];
+
         cat.style.left = catX + 'px';
         cat.style.top = catY + 'px';
-
-        const foodEmojis = ['🐟', '🍖', '🥩', '🍗', '🦴', '🥫'];
+        kitten.style.left = kittenX + 'px';
+        kitten.style.top = kittenY + 'px';
 
         document.body.addEventListener('click', (e) => {
             if (e.target === document.body || e.target.classList.contains('info') || e.target.classList.contains('counter')) {
@@ -268,15 +482,19 @@
             food.textContent = foodEmojis[Math.floor(Math.random() * foodEmojis.length)];
             food.style.left = (x - 25) + 'px';
             food.style.top = (y - 25) + 'px';
+            food.dataset.x = x;
+            food.dataset.y = y;
             document.body.appendChild(food);
-
-            moveCatToFood(food, x, y);
+            foodItems.push(food);
         }
 
         function moveCatToFood(foodElement, targetX, targetY) {
-            if (isMoving) return;
+            if (catMoving || !document.body.contains(foodElement)) {
+                setTimeout(catAI, 500);
+                return;
+            }
 
-            isMoving = true;
+            catMoving = true;
             cat.classList.add('dancing');
 
             const startX = catX;
@@ -288,6 +506,13 @@
             const startTime = Date.now();
 
             function animate() {
+                if (!document.body.contains(foodElement)) {
+                    cat.classList.remove('dancing');
+                    catMoving = false;
+                    setTimeout(catAI, 500);
+                    return;
+                }
+
                 const elapsed = Date.now() - startTime;
                 const progress = Math.min(elapsed / duration, 1);
 
@@ -304,55 +529,85 @@
                 } else {
                     cat.classList.remove('dancing');
                     cat.classList.add('eating');
-                    isEating = true;
-                    eatFood(foodElement);
+                    catEating = true;
+                    eatFood(foodElement, true);
                 }
             }
 
             animate();
         }
 
-        function eatFood(foodElement) {
+        function eatFood(foodElement, isMainCat = true) {
+            if (!foodElement || !document.body.contains(foodElement)) return;
+
+            playEatSound(isMainCat ? 1 : 1.5);
+
             createParticles(
                 parseFloat(foodElement.style.left) + 25,
                 parseFloat(foodElement.style.top) + 25
             );
 
             foodElement.classList.add('eaten');
+            const foodIndex = foodItems.indexOf(foodElement);
+            if (foodIndex > -1) {
+                foodItems.splice(foodIndex, 1);
+            }
 
             setTimeout(() => {
-                foodElement.remove();
-                foodCount++;
-                foodCountDisplay.textContent = foodCount;
+                if (document.body.contains(foodElement)) {
+                    foodElement.remove();
+                }
 
-                setTimeout(() => {
-                    cat.classList.remove('eating');
+                if (isMainCat) {
+                    foodCount++;
+                    foodCountDisplay.textContent = foodCount;
 
-                    // 5의 배수 체크
-                    if (foodCount % 5 === 0) {
-                        performSpinDance();
-                        createBgCatEffect();
-                    }
+                    setTimeout(() => {
+                        cat.classList.remove('eating');
 
-                    // 10의 배수 체크 - 고양이 크기 증가
-                    if (foodCount % 10 === 0) {
-                        growCat();
-                    } else {
-                        isMoving = false;
-                        isEating = false;
-                    }
-                }, 1000);
+                        if (foodCount % 5 === 0 && foodCount % 10 !== 0) {
+                            playHappySound();
+                            performSpinDance(cat);
+                            createBgCatEffect();
+                        }
+
+                        if (foodCount % 10 === 0) {
+                            growCat();
+                        } else {
+                            catMoving = false;
+                            catEating = false;
+                            setTimeout(catAI, 500);
+                        }
+                    }, 1000);
+                } else {
+                    kittenSize += 5;
+                    kitten.style.width = kittenSize + 'px';
+                    kitten.style.height = kittenSize + 'px';
+
+                    setTimeout(() => {
+                        kitten.classList.remove('eating');
+                        kittenMoving = false;
+                        kittenEating = false;
+
+                        if (kittenSize >= catSize) {
+                            startPartyMode();
+                        } else {
+                            setTimeout(kittenAI, 500);
+                        }
+                    }, 500);
+                }
             }, 500);
         }
 
-        function performSpinDance() {
-            cat.classList.add('spinning');
+        function performSpinDance(element) {
+            element.classList.add('spinning');
 
             setTimeout(() => {
-                cat.classList.remove('spinning');
-                if (foodCount % 10 !== 0) {
-                    isMoving = false;
-                    isEating = false;
+                element.classList.remove('spinning');
+                if (element === cat && foodCount % 10 !== 0) {
+                    catMoving = false;
+                    catEating = false;
+                    setTimeout(catAI, 500);
                 }
             }, 1500);
         }
@@ -387,8 +642,9 @@
 
             setTimeout(() => {
                 cat.style.transition = 'all 0.1s ease';
-                isMoving = false;
-                isEating = false;
+                catMoving = false;
+                catEating = false;
+                setTimeout(catAI, 500);
             }, 500);
         }
 
@@ -417,11 +673,241 @@
             }
         }
 
+        function startPartyMode() {
+            if (isPartyMode) return;
+            isPartyMode = true;
+
+            // 밤 배경 활성화
+            nightOverlay.classList.add('active');
+
+            // 별 생성
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 2 + 's';
+                nightOverlay.appendChild(star);
+            }
+
+            // 화면 중앙 계산
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+
+            // 두 고양이를 중앙으로 이동 (나란히)
+            const targetCatX = centerX - catSize - 50;
+            const targetCatY = centerY - catSize / 2;
+            const targetKittenX = centerX + 50;
+            const targetKittenY = centerY - kittenSize / 2;
+
+            // 부드럽게 이동
+            cat.style.transition = 'left 1s ease, top 1s ease';
+            kitten.style.transition = 'left 1s ease, top 1s ease';
+
+            catX = targetCatX;
+            catY = targetCatY;
+            kittenX = targetKittenX;
+            kittenY = targetKittenY;
+
+            cat.style.left = catX + 'px';
+            cat.style.top = catY + 'px';
+            kitten.style.left = kittenX + 'px';
+            kitten.style.top = kittenY + 'px';
+
+            setTimeout(() => {
+                cat.classList.add('party');
+                kitten.classList.add('party');
+
+                spotlight1.classList.add('active');
+                spotlight2.classList.add('active');
+
+                // 스포트라이트를 두 고양이 사이에 배치
+                const spotlightX = centerX - 150;
+                const spotlightY = centerY - 150;
+
+                spotlight1.style.left = spotlightX + 'px';
+                spotlight1.style.top = spotlightY + 'px';
+                spotlight2.style.left = (spotlightX + 100) + 'px';
+                spotlight2.style.top = spotlightY + 'px';
+
+                playPartyMusic();
+
+                let spotlightInterval = setInterval(() => {
+                    spotlight1.style.left = (spotlightX + Math.random() * 60 - 30) + 'px';
+                    spotlight1.style.top = (spotlightY + Math.random() * 60 - 30) + 'px';
+                    spotlight2.style.left = (spotlightX + 100 + Math.random() * 60 - 30) + 'px';
+                    spotlight2.style.top = (spotlightY + Math.random() * 60 - 30) + 'px';
+                }, 200);
+
+                setTimeout(() => {
+                    clearInterval(spotlightInterval);
+                    nightOverlay.classList.remove('active');
+                    cat.classList.remove('party');
+                    kitten.classList.remove('party');
+                    spotlight1.classList.remove('active');
+                    spotlight2.classList.remove('active');
+
+                    // 별 제거
+                    const stars = nightOverlay.querySelectorAll('.star');
+                    stars.forEach(star => star.remove());
+
+                    // transition 원래대로
+                    cat.style.transition = 'all 0.1s ease';
+                    kitten.style.transition = 'all 0.1s ease';
+
+                    isPartyMode = false;
+                    catMoving = false;
+                    kittenMoving = false;
+
+                    setTimeout(() => {
+                        catAI();
+                        kittenAI();
+                    }, 500);
+                }, 5000);
+            }, 1000);
+        }
+
+        function catAI() {
+            if (catMoving || catEating || isPartyMode) return;
+
+            if (foodItems.length === 0) {
+                setTimeout(catAI, 1000);
+                return;
+            }
+
+            let closestFood = null;
+            let minDistance = Infinity;
+
+            foodItems.forEach(food => {
+                const fx = parseFloat(food.dataset.x);
+                const fy = parseFloat(food.dataset.y);
+                const dist = Math.sqrt(
+                    Math.pow(fx - (catX + catSize / 2), 2) +
+                    Math.pow(fy - (catY + catSize / 2), 2)
+                );
+
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestFood = food;
+                }
+            });
+
+            if (closestFood && document.body.contains(closestFood)) {
+                moveCatToFood(
+                    closestFood,
+                    parseFloat(closestFood.dataset.x),
+                    parseFloat(closestFood.dataset.y)
+                );
+            } else {
+                setTimeout(catAI, 1000);
+            }
+        }
+
+        function kittenAI() {
+            if (kittenMoving || kittenEating || isPartyMode) return;
+
+            if (foodItems.length === 0) {
+                setTimeout(kittenAI, 1000);
+                return;
+            }
+
+            let closestFood = null;
+            let minDistance = Infinity;
+
+            foodItems.forEach(food => {
+                const fx = parseFloat(food.dataset.x);
+                const fy = parseFloat(food.dataset.y);
+                const dist = Math.sqrt(
+                    Math.pow(fx - (kittenX + kittenSize / 2), 2) +
+                    Math.pow(fy - (kittenY + kittenSize / 2), 2)
+                );
+
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    closestFood = food;
+                }
+            });
+
+            if (closestFood && document.body.contains(closestFood)) {
+                moveKittenToFood(
+                    closestFood,
+                    parseFloat(closestFood.dataset.x),
+                    parseFloat(closestFood.dataset.y)
+                );
+            } else {
+                setTimeout(kittenAI, 1000);
+            }
+        }
+
+        function moveKittenToFood(foodElement, targetX, targetY) {
+            if (kittenMoving || !document.body.contains(foodElement)) {
+                setTimeout(kittenAI, 500);
+                return;
+            }
+
+            kittenMoving = true;
+            kitten.classList.add('dancing');
+
+            const startX = kittenX;
+            const startY = kittenY;
+            const deltaX = targetX - (kittenSize / 2) - startX;
+            const deltaY = targetY - (kittenSize / 2) - startY;
+            const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            const duration = Math.min(distance * 3, 3000);
+            const startTime = Date.now();
+
+            function animate() {
+                if (!document.body.contains(foodElement)) {
+                    kitten.classList.remove('dancing');
+                    kittenMoving = false;
+                    setTimeout(kittenAI, 500);
+                    return;
+                }
+
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+                kittenX = startX + deltaX * easeProgress;
+                kittenY = startY + deltaY * easeProgress;
+
+                kitten.style.left = kittenX + 'px';
+                kitten.style.top = kittenY + 'px';
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    kitten.classList.remove('dancing');
+
+                    if (document.body.contains(foodElement)) {
+                        kitten.classList.add('eating');
+                        kittenEating = true;
+                        eatFood(foodElement, false);
+                    } else {
+                        kittenMoving = false;
+                    }
+                }
+            }
+
+            animate();
+        }
+
+        setTimeout(() => {
+            catAI();
+            kittenAI();
+        }, 2000);
+
         window.addEventListener('resize', () => {
             catX = Math.min(catX, window.innerWidth - catSize);
             catY = Math.min(catY, window.innerHeight - catSize);
             cat.style.left = catX + 'px';
             cat.style.top = catY + 'px';
+
+            kittenX = Math.min(kittenX, window.innerWidth - kittenSize);
+            kittenY = Math.min(kittenY, window.innerHeight - kittenSize);
+            kitten.style.left = kittenX + 'px';
+            kitten.style.top = kittenY + 'px';
         });
     </script>
 </body>
